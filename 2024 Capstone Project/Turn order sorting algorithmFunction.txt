@@ -1,0 +1,72 @@
+void ACombatManager::SortTurnOrder(bool turnIterated, bool SizeChanged)
+{
+	isUpdatingTurnOrder = true;
+
+	if (turnIterated) //Sorts the turn order as turns iterate
+	{
+		AHeroCharacter* Temp;
+		AHeroCharacter* ToChange;
+
+		ToChange = sortedTurnOrder[sortedTurnOrder.Num() - 1];
+
+		for (int i = sortedTurnOrder.Num() - 1; i > 0 ; i--)
+		{
+			if (i != 0)
+			{
+				Temp = sortedTurnOrder[i - 1];
+				sortedTurnOrder[i - 1] = ToChange;
+				ToChange = Temp;
+			}
+		}
+
+		sortedTurnOrder[sortedTurnOrder.Num() - 1] = ToChange;
+
+	}
+	if (SizeChanged)  // Sorts the turn order if a unit was added
+	{
+		int count = 1;
+		bool found = false;
+
+		sortedTurnOrder.Empty();
+		//sortedTurnOrder.Init(nullptr, turnOrder.Num());
+		for (int i = 0; i < turnOrder.Num(); i++)
+		{
+			sortedTurnOrder.Add(turnOrder[i]);
+		}
+		//sortedTurnOrder = turnOrder;
+
+		sortedTurnOrder[0] = turnOrder[activeUnit];
+		
+		if (activeUnit == turnOrder.Num() - 1)
+		{
+			for (int i = 0; i < activeUnit; i++)
+			{
+				sortedTurnOrder[i + 1] = turnOrder[i];
+			}
+		}
+		else if(activeUnit == 0)
+		{
+			for (int i = 1; i < turnOrder.Num(); i++)
+			{
+				sortedTurnOrder[i] = turnOrder[i];
+			}
+		}
+		else
+		{
+			for (int i = activeUnit + 1; i < turnOrder.Num(); i++)
+			{
+				sortedTurnOrder[count] = turnOrder[i];
+				count++;
+			}
+			for (int i = 0; i < activeUnit; i++)
+			{
+				sortedTurnOrder[count] = turnOrder[i];
+				count++;
+			}
+		}
+	}
+
+	//Removes invalid and null objects from the turnOrder and sortedTurnOrder
+	CheckForNull();
+
+}
