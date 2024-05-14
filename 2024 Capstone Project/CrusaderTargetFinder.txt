@@ -1,36 +1,3 @@
-#include "CrusaderTargetFinder.h"
-#include "HeroCharacter.h"
-#include "CombatManager.h"
-
-// Sets default values for this component's properties
-UCrusaderTargetFinder::UCrusaderTargetFinder()
-{
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = true;
-
-	// ...
-}
-
-
-// Called when the game starts
-void UCrusaderTargetFinder::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// ...
-	
-}
-
-
-// Called every frame
-void UCrusaderTargetFinder::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	// ...
-}
-
 int UCrusaderTargetFinder::FindTarget(bool hasItem, bool hasGrenade, FVector& targetLoc, AHeroCharacter*& target)
 {
 	TArray<AHeroCharacter*> herosInRange;
