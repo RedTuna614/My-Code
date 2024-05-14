@@ -1,0 +1,299 @@
+#include "CrusaderTargetFinder.h"
+#include "HeroCharacter.h"
+#include "CombatManager.h"
+
+// Sets default values for this component's properties
+UCrusaderTargetFinder::UCrusaderTargetFinder()
+{
+	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
+	// off to improve performance if you don't need them.
+	PrimaryComponentTick.bCanEverTick = true;
+
+	// ...
+}
+
+
+// Called when the game starts
+void UCrusaderTargetFinder::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// ...
+	
+}
+
+
+// Called every frame
+void UCrusaderTargetFinder::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	// ...
+}
+
+int UCrusaderTargetFinder::FindTarget(bool hasItem, bool hasGrenade, FVector& targetLoc, AHeroCharacter*& target)
+{
+	TArray<AHeroCharacter*> herosInRange;
+	TArray<AHeroCharacter*> aIMechUnits;
+	TArray<int> mechIndex;
+	FVector actorLoc = Owner->GetActorLocation();
+	float smallDist = 0;
+	bool switchWeapon = false;
+	bool canReach = false;
+	int targetIndex = 0;
+
+	if (combatManager->turnOrder.IsValidIndex(combatManager->FindHeroInTurnOrder()))
+		targetIndex = combatManager->FindHeroInTurnOrder();
+
+	smallDist = FVector::Dist(combatManager->turnOrder[targetIndex]->GetActorLocation(), actorLoc);
+
+	for (int i = 0; i < combatManager->turnOrder.Num(); i++)
+	{
+		if (combatManager->turnOrder[i]->ActorHasTag("Hero"))
+		{
+			if (FVector::Dist(combatManager->turnOrder[i]->GetActorLocation(), actorLoc) < smallDist)
+			{
+				smallDist = FVector::Dist(combatManager->turnOrder[i]->GetActorLocation(), actorLoc);
+				targetIndex = i;
+			}
+		}
+	}
+
+	target = combatManager->turnOrder[targetIndex];
+	targetLoc = target->GetActorLocation();
+
+	//Returns 2 if Crusader should throw a grenade
+	if (hasItem && hasGrenade)
+	{
+		for (AHeroCharacter* unit : combatManager->turnOrder)
+		{
+			if (unit->ActorHasTag("Hero"))
+			{
+				if (FVector::Dist(unit->GetActorLocation(), actorLoc) <=
+					(Owner->statsList[4] + itemList[activeItem].X))
+				{
+					herosInRange.Add(unit);
+				}
+			}
+		}
+
+		if (herosInRange.Num() > 1)
+		{
+			for (int i = 0; i < herosInRange.Num(); i++)
+			{
+				for (AHeroCharacter* hero : herosInRange)
+				{
+					if (herosInRange[i] != hero)
+					{
+						if (FVector::Dist(herosInRange[i]->GetActorLocation(), hero->GetActorLocation()) <=
+							itemList[activeItem].Z)
+						{
+							mechIndex.Add(i);
+							canReach = true;
+						}
+					}
+				}
+			}
+
+			if (canReach)
+			{
+				smallDist = FVector::Dist(actorLoc, herosInRange[mechIndex[0]]->GetActorLocation());
+
+				for (int i : mechIndex)
+				{
+					if (FVector::Dist(actorLoc, herosInRange[i]->GetActorLocation()) < smallDist)
+					{
+						targetIndex = i;
+						smallDist = FVector::Dist(actorLoc, herosInRange[i]->GetActorLocation());
+					}
+				}
+
+				target = herosInRange[targetIndex];
+				targetLoc = target->GetActorLocation();
+				return 2;
+			}
+		}
+	}
+
+	//Returns 4 if Crusader should Melee attack a Hero
+	//Returns 5 if Crusader should shoot a Hero
+	if (Owner->IsRangeWeapon())
+	{
+		for (AHeroCharacter* unit : combatManager->turnOrder)
+		{
+			if (unit->ActorHasTag("Hero"))
+			{
+				if (FVector::Dist(unit->GetActorLocation(), actorLoc) <=
+					(Owner->statsList[4] + Owner->WeaponStats[Owner->ActiveWeapon].Z))
+				{
+					herosInRange.Add(unit);
+					canReach = true;
+
+					if (FVector::Dist(unit->GetActorLocation(), actorLoc) <= 500)
+					{
+						switchWeapon = true;
+					}
+				}
+			}
+			if (unit->ActorHasTag("Enemy") && unit != Owner)
+			{
+				aIMechUnits.Add(unit);
+			}
+		}
+
+		if (canReach)
+		{
+			if (switchWeapon && combatManager->FindAIMechInTurnOrder(Owner)->IsValidLowLevel())
+			{
+				Owner->ActiveWeapon = FMath::RandRange(0, 1);
+				smallDist = FVector::Dist(herosInRange[0]->GetActorLocation(),
+					combatManager->FindAIMechInTurnOrder(Owner)->GetActorLocation());
+
+				for (AHeroCharacter* hero : herosInRange)
+				{
+					for (AHeroCharacter* unit : aIMechUnits)
+					{
+						if (FVector::Dist(hero->GetActorLocation(), unit->GetActorLocation()) < smallDist)
+						{
+							smallDist = FVector::Dist(hero->GetActorLocation(), unit->GetActorLocation());
+							target = hero;
+						}
+					}
+				}
+
+				targetLoc = target->GetActorLocation();
+				return 4;
+
+			}
+			else
+			{
+				if (herosInRange.Num() == 1)
+				{
+					target = herosInRange[0];
+					targetLoc = target->GetActorLocation();
+
+					return 5;
+				}
+				else
+				{
+					smallDist = FVector::Dist(herosInRange[0]->GetActorLocation(), aIMechUnits[0]->GetActorLocation());
+
+					for (AHeroCharacter* hero : herosInRange)
+					{
+						for (AHeroCharacter* unit : aIMechUnits)
+						{
+							if (FVector::Dist(hero->GetActorLocation(), unit->GetActorLocation()) < smallDist)
+							{
+								smallDist = FVector::Dist(hero->GetActorLocation(), unit->GetActorLocation());
+								target = hero;
+							}
+						}
+					}
+
+					targetLoc = target->GetActorLocation();
+					return 5;
+
+				}
+			}
+		}
+	}
+	else
+	{
+		for (AHeroCharacter* unit : combatManager->turnOrder)
+		{
+			if (unit->ActorHasTag("Hero"))
+			{
+				if (FVector::Dist(unit->GetActorLocation(), actorLoc) <=
+					(Owner->statsList[4] + Owner->WeaponStats[Owner->ActiveWeapon].Z))
+				{
+					herosInRange.Add(unit);
+					canReach = true;
+				}
+			}
+			if (unit->ActorHasTag("Enemy") && unit != Owner && unit->IsValidLowLevel())
+			{
+				aIMechUnits.Add(unit);
+			}
+		}
+		if (canReach)
+		{
+			if (herosInRange.Num() == 1)
+			{
+				target = herosInRange[0];
+				targetLoc = target->GetActorLocation();
+
+				return 4;
+			}
+			else
+			{
+				smallDist = FVector::Dist(herosInRange[0]->GetActorLocation(), aIMechUnits[0]->GetActorLocation());
+
+				for (AHeroCharacter* hero : herosInRange)
+				{
+					for (AHeroCharacter* unit : aIMechUnits)
+					{
+						if (FVector::Dist(hero->GetActorLocation(), unit->GetActorLocation()) < smallDist)
+						{
+							smallDist = FVector::Dist(hero->GetActorLocation(), unit->GetActorLocation());
+							target = hero;
+						}
+					}
+				}
+
+				targetLoc = target->GetActorLocation();
+				return 4;
+			}
+		}
+		else
+		{
+			Owner->ActiveWeapon = 2;
+
+			for (AHeroCharacter* unit : combatManager->turnOrder)
+			{
+				if (unit->ActorHasTag("Hero"))
+				{
+					if (FVector::Dist(unit->GetActorLocation(), actorLoc) <=
+						(Owner->statsList[4] + Owner->WeaponStats[Owner->ActiveWeapon].Z))
+					{
+						herosInRange.Add(unit);
+						canReach = true;
+					}
+				}
+			}
+
+			if (canReach)
+			{
+				if (herosInRange.Num() == 1)
+				{
+					target = herosInRange[0];
+					targetLoc = target->GetActorLocation();
+
+					return 5;
+				}
+				else
+				{
+					smallDist = FVector::Dist(herosInRange[0]->GetActorLocation(), aIMechUnits[0]->GetActorLocation());
+
+					for (AHeroCharacter* hero : herosInRange)
+					{
+						for (AHeroCharacter* unit : aIMechUnits)
+						{
+							if (FVector::Dist(hero->GetActorLocation(), unit->GetActorLocation()) < smallDist)
+							{
+								smallDist = FVector::Dist(hero->GetActorLocation(), unit->GetActorLocation());
+								target = hero;
+							}
+						}
+					}
+
+					targetLoc = target->GetActorLocation();
+					return 5;
+				}
+			}
+		}
+	}
+
+	//Returns 0 if no hero mechs are in Crusader's attack range
+
+	return 0;
+}
